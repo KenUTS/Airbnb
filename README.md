@@ -1,15 +1,32 @@
-Welcome to your new dbt project!
+# Airbnb Analysis: Leveraging Data Insights for Strategic Decision-Making
+The aim of this task is to construct data pipelines that are ready for deployment and can be used in a production environment using Airflow and Google Cloud Platform (Cloud Composer and SQL instance). The primary objective of this project is to process and clean the provided datasets obtained from Airbnb and the government's census. The second objective of this project is to load the valuable data into a data warehouse using ELT pipelines and a data mart for the purpose of analysis. This project examines the host characteristics, including the host's name or address, as well as the listing elements such as room type, property type, and accommodation. Additionally, the project analyzes the reviews features, including the review score. Other significant factors, such as pricing, duration of stay, revenue, age demographics, and housing arrangements, are also utilized to analyze the activities, incomes and mortgage of hosts using the Airbnb platform.
 
-### Using the starter project
+## Steps
 
-Try running the following commands:
-- dbt run
-- dbt test
+1. Data loading: The first phase of this project entails importing unprocessed data into Postgres using Airflow. The provided datasets are uploaded to the AirFlow storage bucket and subsequently imported into the raw schema on Postgres. The raw schema consists of the necessary raw tables that store the raw data, utilizing DBeaver.
 
+![alt text](https://github.com/KenUTS/Airbnb/blob/9ed78657f0c4fad2baffa777f25e082254bf7e00/airbnb.png)
+ 
+ Figure 1: The graph tree in importing data to raw schema.
+ 
+The diagram above illustrates a DAG structure that represents the logic of operators. The tasks "import_load_dim_census_g01_task" and "import_load_dim_census_g02_task" can be executed simultaneously for the dependency structure. After both tasks have successfully finished, the tasks "import_load_dim_nsw_code_task" and 
+"import_load_dim_nsw_suburb_task" will run concurrently. Ultimately, once both sets of activities are finished, the import_load_facts_listings_task will be executed.
 
-### Resources:
-- Learn more about dbt [in the docs](https://docs.getdbt.com/docs/introduction)
-- Check out [Discourse](https://discourse.getdbt.com/) for commonly asked questions and answers
-- Join the [chat](https://community.getdbt.com/) on Slack for live discussions and support
-- Find [dbt events](https://events.getdbt.com) near you
-- Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
+The import function established all potential columns and inserted each record into a newly formed schema. In addition, the schema has a limitation on the number of pages that can be uploaded due to the huge file size. Therefore, the facts files are read and imported separately.
+
+2. Data warehouse: The second phased of this project is to design the architecture of a data warehouse on Postgres with 4 layers:
+  - Raw: It contains the raw tables that store unprocessed data. It also includes snapshots of dimensions that specify properties such as the type of room, type of property, and host entities.
+  - Staging: It contains transformation, cleaning and rename processes of the raw and snapshot data. There are 8 stage files are created in this project:
+    - G01_stg: stores census data, including the LGA code, as well as statistical information such as the population count for different age groups. A transformation process is performed to change the LGA code into a numerical representation. An unknown record is also defined for future works.
+    - G02_stg: contains census data, including the LGA code, as well as statistics information such as the monthly median mortgage repayment. A transformation process is performed to change the LGA code into a numerical representation. An unknown record is also defined for future works.
+    - Lga_stg: stores NSW LGA data, including the LGA code and LGA name. An uppercase transformation method is executed to convert all LGA names into capital letters.
+    - Suburb_stg: stores NSW LGA data, including the LGA name and LGA suburb.
+    - Host_stg: contains the host attributes, such as host identification, host name, host address, and superhost status. The cleaning technique involves replacing null entries with the value "unknown" and applying an uppercase translation method to turn all host addresses into capital letters. An unknown record is also established for future works.
+    - Room_stg: holds information about rooms, including their types and identification numbers. The renaming process is carried out in order to change the label of a room. An unknown record is also defined for future works.
+    - Property_stg: holds information about property, including their types and identification numbers. The renaming process is carried out in order to change the label of a property. An unknown record is also defined for future works.
+    - Listing_stg: contains data related to listings, including the listing identification, scraped date, address, accommodation details, price, and length of stay. It also includes attributes related to reviews, such as the number of reviews, rating scores, accuracy scores, cleanliness scores, check-in scores, communication scores, and value scores. In addition, it includes dimension identification for the host, room, and property. The cleaning methodology entails substituting null entries with the value "unknown" and implementing an uppercase translation algorithm to convert all list addresses into capital letters. Additional transformations are executed to convert the data type of certain columns to integer and date formats.
+  - Warehouse: star schema consisting of seven dimension tables and one fact table. Dimension tables provide a description of the different properties or characteristics of the data, whereas the fact table describes the measurable aspects and is used to establish connections with other datasets. In this project, the fact table is combined with dimensions such as host, property, room and LGA.
+  - Datamart: The final layer is usually optimised specifically for reporting and analytical purposes.
+    - The first data mart provides comprehensive information on active listings in each combination of neighbourhood of list and month in year, encompassing key statistical measures such as the minimum, maximum, median, and average prices, the count of distinct hosts, the proportion of Superhosts, the average rating for current listings, percentage fluctuations in active and inactive listings, the total number of stays, and the average projected revenue per current listing.
+    - The second data mart provides comprehensive information on active listings in each combination of property type, room type, accommodates and month in year, encompassing key statistical measures such as the minimum, maximum, median, and average prices, the count of distinct hosts, the proportion of Superhosts, the average rating for current listings, percentage fluctuations in active and inactive listings, the total number of stays, and the average projected revenue per current listing.
+    - The third data mart provides a thorough overview of host information categorised by host suburb and month in a given year. It includes important statistical metrics such as the number of unique hosts, estimated revenue, and estimated revenue per unique host.
